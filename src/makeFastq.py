@@ -1,48 +1,37 @@
 #!/usr/local/bin/python
 
 """
-@todo documentation
+Generate simulated reads from a reference sequence and a file with variants in 
+HGVS notation.
 
-@requires SOAPpy
-@requires random
-@requires Bio.Seq
-@requires getopt
-@requires sys
+Options
+=======
+    -r NAME  --reference=NAME
+    Name of the reference sequence.
 
-@arg -o:
-@type -o:
-@arg --output=:
-@type --output=:
+    -i NAME  --input=NAME
+    Name of the input file.
 
-@arg -r:
-@type -r:
-@arg --reference=:
-@type --reference=:
+    -o NAME  --output=NAME
+    Name of the output files, will be appended with "_1.fq" and "_2.fq".
 
-@arg -i:
-@type -i:
-@arg --input=:
-@type --input=:
+    -s NUM  --insert=NUM
+    Mean insert size.
 
-@arg -s:
-@type -s:
-@arg --insert=:
-@type --insert=:
+    -v NUM  --var=NUM
+    Standard deviation of the insert size.
 
-@arg -v:
-@type -v:
-@arg --var=:
-@type --var=:
+    -l NUM  --length=NUM
+    Read length.
 
-@arg -l:
-@type -l:
-@arg --lengh=:
-@type --lengh=:
+    -n NUM  --number=NUM
+    Number of mates per left read.
 
-@arg -n:
-@type -n:
-@arg --number=:
-@type --number=:
+@requires: SOAPpy
+@requires: random
+@requires: Bio.Seq
+@requires: getopt
+@requires: sys
 """
 
 import SOAPpy
@@ -51,6 +40,7 @@ import Bio.Seq
 import getopt
 import sys
 
+# Location of the Mutalyzer webservice.
 mutalyzerServiceDescription = "http://www.mutalyzer.nl/2.0/service.wsdl"
 
 def getVariant(handle) :
@@ -83,6 +73,7 @@ def main() :
     readLength = 50
     numberOfMates = 5
 
+    # Argument parsing.
     try :
         opts, args = getopt.getopt(sys.argv[1:], "r:i:o:s:v:l:n", [
             "reference=", "input=", "output=", "insert=", "var=", "length=",
@@ -91,7 +82,6 @@ def main() :
         print str(err)
         sys.exit(2)
     #except
-
     for option, argument in opts :
         if option in ("-r", "--reference") :
             referenceSequence = argument
@@ -113,7 +103,7 @@ def main() :
             assert False, "Unhandled option."
     #for
     if not outputFile1 :
-        print "No output given."
+        print "No output given, use -o NAME"
         sys.exit(2)
     #if
 
