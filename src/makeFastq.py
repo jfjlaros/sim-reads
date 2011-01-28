@@ -9,6 +9,15 @@ Options
     -r NAME  --reference=NAME
     Name of the reference sequence.
 
+    -b NUM  --start=NUM
+    Begin of the slice of the reference sequence.
+
+    -e NUM  --end=NUM
+    End of the slice of the reference sequence.
+
+    -t NUM  --orientation=NUM
+    Orientation of the slice: 1=forward, 2=reverse.
+
     -i NAME  --input=NAME
     Name of the input file.
 
@@ -25,7 +34,7 @@ Options
     Read length.
 
     -n NUM  --number=NUM
-    Number of mates per left read.
+    Number of reads.
 
 @requires: SOAPpy
 @requires: random
@@ -64,20 +73,25 @@ def main() :
     """
 
     # Some default parameters.
-    referenceSequence = "UD_129077402355"
+    referenceSequence = "NC_000008.10"
+    referenceStart = 136800000
+    referenceEnd = 139000000
+    referenceOrientation = 1 # 1=forward, 2=reverse
+
     inputFile = "input.txt"
     outputFile1 = None
     outputFile2 = None
+    resultsFile = None
     insertSize = 300
     variation = 25
     readLength = 50
-    numberOfMates = 5
+    numberOfReads = 1000000
 
     # Argument parsing.
     try :
-        opts, args = getopt.getopt(sys.argv[1:], "r:i:o:s:v:l:n", [
-            "reference=", "input=", "output=", "insert=", "var=", "length=",
-            "number="])
+        opts, args = getopt.getopt(sys.argv[1:], "r:b:e:t:i:o:s:v:l:n:", [
+            "reference=", "start", "end", "orientation", "input=", "output=",
+            "insert=", "var=", "length=", "number="])
     except getopt.GetoptError, err :
         print str(err)
         sys.exit(2)
@@ -85,20 +99,27 @@ def main() :
     for option, argument in opts :
         if option in ("-r", "--reference") :
             referenceSequence = argument
+        elif option in ("-b", "--input") :
+            referenceStart = int(argument)
+        elif option in ("-e", "--input") :
+            referenceEnd = int(argument)
+        elif option in ("-t", "--input") :
+            referenceOrientation = argument
         elif option in ("-i", "--input") :
             inputFile = argument
         elif option in ("-o", "--output") :
             outputFile1 = "%s_1.fq" % argument
             outputFile2 = "%s_2.fq" % argument
+            resultsFile = "%s.txt" % argument
         #elif
         elif option in ("-s", "--insert") :
-            insertSize = argument
+            insertSize = int(argument)
         elif option in ("-v", "--var") :
-            variation = argument
+            variation = int(argument)
         elif option in ("-l", "--length") :
-            readLength = argument
+            readLength = int(argument)
         elif option in ("-n", "--number") :
-            numberOfMates = argument
+            numberOfReads = int(argument)
         else :
             assert False, "Unhandled option."
     #for
@@ -117,27 +138,42 @@ def main() :
     #while
     inputHandle.close()
     
-    # Make a mutated sequence.
+    # Set up the SOAP interface to Mutalyzer.
     mutalyzerService = SOAPpy.WSDL.Proxy(mutalyzerServiceDescription)
+
+    # Retrieve the reference sequence.
+    UD = mutalyzerService.sliceChromosome(
+        chromAccNo = referenceSequence, start = referenceStart, 
+        end = referenceEnd, orientation = referenceOrientation)
+
+    # Mutate the reference sequence.
     mutalyzerOutput = mutalyzerService.runMutalyzer(
-        variant = "%s:g.[%s]" % (referenceSequence, allelicVariant))
+        variant = "%s:g.[%s]" % (UD, allelicVariant))
     sequence = mutalyzerOutput.mutated
+
+    # Write the chromosomal description to the results file.
+    resultsHandle = open(resultsFile, "w")
+    resultsHandle.write("%s: %s:%i_%i\n\n" % (
+        UD, referenceSequence, referenceStart, referenceEnd))
+    for i in mutalyzerOutput.chromDescription.split("[")[1][:-1].split(';') :
+        resultsHandle.write("%s\n" % i)
+    #for
+    resultsHandle.close()
 
     # Make the simulated reads.
     outputHandle1 = open(outputFile1, "w")
     outputHandle2 = open(outputFile2, "w")
     readNumber = 1
-    for i in range(len(sequence) - readLength - insertSize) :
-        for j in range(numberOfMates) :
-            myInsertSize = int(random.normalvariate(insertSize, variation))
-            outputHandle1.write("@%i_forward/1\n%s\n+\n%s\n" % (
-                readNumber, sequence[i:i + readLength], "I" * readLength))
-            outputHandle2.write("@%i_reverse/2\n%s\n+\n%s\n" % (
-                readNumber, Bio.Seq.reverse_complement(
-                    sequence[i + myInsertSize - readLength:i + myInsertSize]),
-                "I" * readLength))
-            readNumber += 1
-        #for
+    for i in range(numberOfReads) :
+        position = random.randint(0, len(sequence) - insertSize)
+        myInsertSize = int(random.normalvariate(insertSize, variation))
+        outputHandle1.write("@%i_forward/1\n%s\n+\n%s\n" % (readNumber, 
+            sequence[position:position + readLength], "I" * readLength))
+        outputHandle2.write("@%i_reverse/2\n%s\n+\n%s\n" % (
+            readNumber, Bio.Seq.reverse_complement(
+                sequence[position + myInsertSize - readLength:
+                    position + myInsertSize]), "I" * readLength))
+        readNumber += 1
     #for
     outputHandle2.close()
     outputHandle1.close()
