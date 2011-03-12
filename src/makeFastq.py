@@ -41,6 +41,8 @@ Options
 @requires: Bio.Seq
 @requires: getopt
 @requires: sys
+
+@todo: Make the quality score a command line parameter.
 """
 
 import SOAPpy
@@ -167,12 +169,12 @@ def main() :
     for i in range(numberOfReads) :
         position = random.randint(0, len(sequence) - insertSize)
         myInsertSize = int(random.normalvariate(insertSize, variation))
-        outputHandle1.write("@%i_forward/1\n%s\n+\n%s\n" % (readNumber, 
-            sequence[position:position + readLength], "I" * readLength))
-        outputHandle2.write("@%i_reverse/2\n%s\n+\n%s\n" % (
+        outputHandle1.write("@%i/1\n%s\n+\n%s\n" % (readNumber, 
+            sequence[position:position + readLength], "b" * readLength))
+        outputHandle2.write("@%i/2\n%s\n+\n%s\n" % (
             readNumber, Bio.Seq.reverse_complement(
                 sequence[position + myInsertSize - readLength:
-                    position + myInsertSize]), "I" * readLength))
+                    position + myInsertSize]), "b" * readLength))
         readNumber += 1
     #for
     outputHandle2.close()
