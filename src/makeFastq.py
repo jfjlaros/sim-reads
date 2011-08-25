@@ -15,6 +15,9 @@ Options
     -e NUM  --end=NUM
     End of the slice of the reference sequence.
 
+    -u NAME  --reference=NAME
+    Accession number of the reference sequence (overrides -r, -b and -e).
+
     -t NUM  --orientation=NUM
     Orientation of the slice: 1=forward, 2=reverse.
 
@@ -88,12 +91,13 @@ def main() :
     variation = 25
     readLength = 50
     numberOfReads = 1000000
+    UD = None
 
     # Argument parsing.
     try :
-        opts, args = getopt.getopt(sys.argv[1:], "r:b:e:t:i:o:s:v:l:n:", [
+        opts, args = getopt.getopt(sys.argv[1:], "r:b:e:t:i:o:s:v:l:n:u:", [
             "reference=", "start", "end", "orientation", "input=", "output=",
-            "insert=", "var=", "length=", "number="])
+            "insert=", "var=", "length=", "number=", "ud="])
     except getopt.GetoptError, err :
         print str(err)
         sys.exit(2)
@@ -122,6 +126,8 @@ def main() :
             readLength = int(argument)
         elif option in ("-n", "--number") :
             numberOfReads = int(argument)
+        elif option in ("-u", "--ud") :
+            UD = argument
         else :
             assert False, "Unhandled option."
     #for
@@ -144,9 +150,10 @@ def main() :
     mutalyzerService = SOAPpy.WSDL.Proxy(mutalyzerServiceDescription)
 
     # Retrieve the reference sequence.
-    UD = mutalyzerService.sliceChromosome(
-        chromAccNo = referenceSequence, start = referenceStart, 
-        end = referenceEnd, orientation = referenceOrientation)
+    if not UD :
+        UD = mutalyzerService.sliceChromosome(
+            chromAccNo = referenceSequence, start = referenceStart, 
+            end = referenceEnd, orientation = referenceOrientation)
 
     # Mutate the reference sequence.
     mutalyzerOutput = mutalyzerService.runMutalyzer(
@@ -157,9 +164,15 @@ def main() :
     resultsHandle = open(resultsFile, "w")
     resultsHandle.write("%s: %s:%i_%i\n\n" % (
         UD, referenceSequence, referenceStart, referenceEnd))
-    for i in mutalyzerOutput.chromDescription.split("[")[1][:-1].split(';') :
+    
+    if mutalyzerOutput.chromDescription :
+        description = mutalyzerOutput.chromDescription
+    else :
+        description = mutalyzerOutput.genomicDescription
+
+    for i in description.split("[")[1][:-1].split(';') :
         resultsHandle.write("%s\n" % i)
-    #for
+
     resultsHandle.close()
 
     # Make the simulated reads.
