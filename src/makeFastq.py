@@ -55,7 +55,7 @@ import getopt
 import sys
 
 # Location of the Mutalyzer webservice.
-mutalyzerServiceDescription = "http://www.mutalyzer.nl/2.0/service.wsdl"
+mutalyzerServiceDescription = "https://mutalyzer.nl/services/?wsdl"
 
 def getVariant(handle) :
     """
@@ -165,7 +165,12 @@ def main() :
     resultsHandle.write("%s: %s:%i_%i\n\n" % (
         UD, referenceSequence, referenceStart, referenceEnd))
     
-    if mutalyzerOutput.chromDescription :
+    if int(mutalyzerOutput.errors) > 0 :
+        for i in mutalyzerOutput.messages[0] :
+            print "Error (%s): %s" % (i.errorcode, i.message)
+        sys.exit(3)
+    #if
+    if "chromDescription" in mutalyzerOutput :
         description = mutalyzerOutput.chromDescription
     else :
         description = mutalyzerOutput.genomicDescription
