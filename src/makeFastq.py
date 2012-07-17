@@ -1,203 +1,201 @@
 #!/usr/local/bin/python
 
 """
-Generate simulated reads from a reference sequence and a file with variants in 
-HGVS notation.
+Generate simulated reads.
 
-Options
-=======
-    -r NAME  --reference=NAME
-    Name of the reference sequence.
 
-    -b NUM  --start=NUM
-    Begin of the slice of the reference sequence.
-
-    -e NUM  --end=NUM
-    End of the slice of the reference sequence.
-
-    -u NAME  --reference=NAME
-    Accession number of the reference sequence (overrides -r, -b and -e).
-
-    -t NUM  --orientation=NUM
-    Orientation of the slice: 1=forward, 2=reverse.
-
-    -i NAME  --input=NAME
-    Name of the input file.
-
-    -o NAME  --output=NAME
-    Name of the output files, will be appended with "_1.fq" and "_2.fq".
-
-    -s NUM  --insert=NUM
-    Mean insert size.
-
-    -v NUM  --var=NUM
-    Standard deviation of the insert size.
-
-    -l NUM  --length=NUM
-    Read length.
-
-    -n NUM  --number=NUM
-    Number of reads.
-
-@requires: SOAPpy
-@requires: random
-@requires: Bio.Seq
-@requires: getopt
-@requires: sys
-
-@todo: Make the quality score a command line parameter.
+See the help of the positional arguments for more info.
 """
+# TODO Make the quality score a command line parameter.
 
 import SOAPpy
 import random
-import Bio.Seq
-import getopt
-import sys
+import argparse
+
+from Bio import Seq
+from Bio import SeqIO
 
 # Location of the Mutalyzer webservice.
 mutalyzerServiceDescription = "https://mutalyzer.nl/services/?wsdl"
 
-def getVariant(handle) :
+def getVariant(handle):
     """
     Read one line from the input file, strip the newline and return it.
 
     @arg handle: Open handle to the input file.
     @type handle: file handle
     """
-
     return handle.readline().strip("\n")
 #getVariant
 
-def main() :
+def writeFastq(results, sequence, numberOfReads, insertSize, variation,
+    readLength):
     """
-    - Read the input file and make one big variant of the description in the
-      input file.
-    - Feed the variant to the Mutalyzer webservice to obtain a mutated
-      reference sequence.
-    - Make paired end reads out of the mutated sequence.
+    Make the simulated reads.
     """
-
-    # Some default parameters.
-    referenceSequence = "NC_000008.10"
-    referenceStart = 136800000
-    referenceEnd = 139000000
-    referenceOrientation = 1 # 1=forward, 2=reverse
-
-    inputFile = "input.txt"
-    outputFile1 = None
-    outputFile2 = None
-    resultsFile = None
-    insertSize = 300
-    variation = 25
-    readLength = 50
-    numberOfReads = 1000000
-    UD = None
-
-    # Argument parsing.
-    try :
-        opts, args = getopt.getopt(sys.argv[1:], "r:b:e:t:i:o:s:v:l:n:u:", [
-            "reference=", "start", "end", "orientation", "input=", "output=",
-            "insert=", "var=", "length=", "number=", "ud="])
-    except getopt.GetoptError, err :
-        print str(err)
-        sys.exit(2)
-    #except
-    for option, argument in opts :
-        if option in ("-r", "--reference") :
-            referenceSequence = argument
-        elif option in ("-b", "--input") :
-            referenceStart = int(argument)
-        elif option in ("-e", "--input") :
-            referenceEnd = int(argument)
-        elif option in ("-t", "--input") :
-            referenceOrientation = argument
-        elif option in ("-i", "--input") :
-            inputFile = argument
-        elif option in ("-o", "--output") :
-            outputFile1 = "%s_1.fq" % argument
-            outputFile2 = "%s_2.fq" % argument
-            resultsFile = "%s.txt" % argument
-        #elif
-        elif option in ("-s", "--insert") :
-            insertSize = int(argument)
-        elif option in ("-v", "--var") :
-            variation = int(argument)
-        elif option in ("-l", "--length") :
-            readLength = int(argument)
-        elif option in ("-n", "--number") :
-            numberOfReads = int(argument)
-        elif option in ("-u", "--ud") :
-            UD = argument
-        else :
-            assert False, "Unhandled option."
-    #for
-    if not outputFile1 :
-        print "No output given, use -o NAME"
-        sys.exit(2)
-    #if
-
-    # Read the input file.
-    inputHandle = open(inputFile, "r")
-    allelicVariant = getVariant(inputHandle)
-    line = getVariant(inputHandle)
-    while line :
-        allelicVariant = "%s;%s" % (allelicVariant, line)
-        line = getVariant(inputHandle)
-    #while
-    inputHandle.close()
-    
-    # Set up the SOAP interface to Mutalyzer.
-    mutalyzerService = SOAPpy.WSDL.Proxy(mutalyzerServiceDescription)
-
-    # Retrieve the reference sequence.
-    if not UD :
-        UD = mutalyzerService.sliceChromosome(
-            chromAccNo = referenceSequence, start = referenceStart, 
-            end = referenceEnd, orientation = referenceOrientation)
-
-    # Mutate the reference sequence.
-    mutalyzerOutput = mutalyzerService.runMutalyzer(
-        variant = "%s:g.[%s]" % (UD, allelicVariant))
-    sequence = mutalyzerOutput.mutated
-
-    # Write the chromosomal description to the results file.
-    resultsHandle = open(resultsFile, "w")
-    resultsHandle.write("%s: %s:%i_%i\n\n" % (
-        UD, referenceSequence, referenceStart, referenceEnd))
-    
-    if int(mutalyzerOutput.errors) > 0 :
-        for i in mutalyzerOutput.messages[0] :
-            print "Error (%s): %s" % (i.errorcode, i.message)
-        sys.exit(3)
-    #if
-    if "chromDescription" in mutalyzerOutput :
-        description = mutalyzerOutput.chromDescription
-    else :
-        description = mutalyzerOutput.genomicDescription
-
-    for i in description.split("[")[1][:-1].split(';') :
-        resultsHandle.write("%s\n" % i)
-
-    resultsHandle.close()
-
-    # Make the simulated reads.
-    outputHandle1 = open(outputFile1, "w")
-    outputHandle2 = open(outputFile2, "w")
+    outputHandle1 = open("%s_1.fq" % results, "w")
+    outputHandle2 = open("%s_2.fq" % results, "w")
     readNumber = 1
-    for i in range(numberOfReads) :
-        position = random.randint(0, len(sequence) - insertSize)
-        myInsertSize = int(random.normalvariate(insertSize, variation))
+    for i in range(numberOfReads):
+        while True:
+            position = random.randint(0, len(sequence) - insertSize)
+            myInsertSize = int(random.normalvariate(insertSize, variation))
+            if position + myInsertSize <= len(sequence):
+                break
+        #while
+
         outputHandle1.write("@%i/1\n%s\n+\n%s\n" % (readNumber, 
             sequence[position:position + readLength], "b" * readLength))
         outputHandle2.write("@%i/2\n%s\n+\n%s\n" % (
-            readNumber, Bio.Seq.reverse_complement(
+            readNumber, Seq.reverse_complement(
                 sequence[position + myInsertSize - readLength:
                     position + myInsertSize]), "b" * readLength))
         readNumber += 1
     #for
     outputHandle2.close()
     outputHandle1.close()
+#writeFastq
+
+def mutate(args):
+    """
+    Use a file containing variants to obtain a mutated reference sequence from
+    Mutalyzer. Then make paired end reads out of the mutated sequence.
+
+
+    If a chromosomal accession number (option -r) is used, the options -b and
+      -e are used to make a slice of this chromosome.
+    To retrieve the reference sequence of a gene, use the -u option. The
+      options -r, -b and -e are ignored.
+    With the -o OUTPUT option the prefix for three output files is given:
+      OUTPUT.txt, OUTPUT_1.fq and OUTPUT_2.fq
+
+
+    @arg args: Argparse argument list.
+    @type args: object
+    """
+    # Read the input file.
+    allelicVariant = getVariant(args.input)
+    line = getVariant(args.input)
+    while line:
+        allelicVariant = "%s;%s" % (allelicVariant, line)
+        line = getVariant(args.input)
+    #while
+    
+    # Set up the SOAP interface to Mutalyzer.
+    mutalyzerService = SOAPpy.WSDL.Proxy(mutalyzerServiceDescription)
+
+    # Retrieve the reference sequence.
+    if not args.accno:
+        args.accno = mutalyzerService.sliceChromosome(
+            chromAccNo=args.reference, start=args.start, end=args.end,
+            orientation=args.orientation)
+
+    # Mutate the reference sequence.
+    mutalyzerOutput = mutalyzerService.runMutalyzer(
+        variant = "%s:g.[%s]" % (args.accno, allelicVariant))
+    sequence = mutalyzerOutput.mutated
+
+    # Write the chromosomal description to the results file.
+    resultsHandle = open("%s.txt" % args.output, "w")
+    resultsHandle.write("%s: %s:%i_%i\n\n" % (args.accno, args.reference,
+        args.start, args.end))
+    
+    if int(mutalyzerOutput.errors) > 0:
+        for i in mutalyzerOutput.messages[0]:
+            raise ValueError("(%s): %s" % (i.errorcode, i.message))
+    #if
+    if "chromDescription" in mutalyzerOutput:
+        description = mutalyzerOutput.chromDescription
+    else:
+        description = mutalyzerOutput.genomicDescription
+
+    for i in description.split("[")[1][:-1].split(';'):
+        resultsHandle.write("%s\n" % i)
+    resultsHandle.close()
+
+    writeFastq(args.output, sequence, args.number, args.insert, args.var,
+        args.length)
+#mutate
+
+def local(args):
+    """
+    Use a local fasta file to make paired end reads.
+
+    @arg args: Argparse argument list.
+    @type args: object
+    """
+    for record in SeqIO.parse(args.refFile, "fasta"):
+        writeFastq(args.output, str(record.seq), args.number, args.insert,
+            args.var,args.length)
+#local
+
+def main():
+    """
+    Main entry point.
+    """
+    outputHelp="prefix of the names of the output files"
+    insertHelp="mean insert size (default=%(default)s)"
+    varHelp="standard deviation of the insert size (default=%(default)s)"
+    lengthHelp="read length (default=%(default)s)"
+    numberHelp="number of reads (default=%(default)s)"
+
+    usage = __doc__.split("\n\n\n")
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=usage[0], epilog=usage[1])
+
+    subparsers = parser.add_subparsers()
+
+    usage = mutate.__doc__.split("\n\n\n")
+    parser_mutate = subparsers.add_parser("mutate",
+        description=usage[0], epilog=usage[1])
+    parser_mutate.add_argument("-r", dest="reference", default="NC_000008.10",
+        type=str, help="chromosomal accession number (default=%(default)s)")
+    parser_mutate.add_argument("-b", dest="start", type=int, default=136800000,
+         help="begin of the slice (default=%(default)s)")
+    parser_mutate.add_argument("-e", dest="end", type=int, default=139000000,
+        help="end of the slice (default=%(default)s)")
+    parser_mutate.add_argument("-u", dest="accno", type=str, default="",
+         help="accession number of a referencence sequence")
+    parser_mutate.add_argument("-t", dest="orientation", default=1, const=2,
+        action="store_const", help="reverse the orientation of the slice")
+    parser_mutate.add_argument("-i", dest="input", type=argparse.FileType('r'),
+        required=True, help="name of the input file")
+    parser_mutate.add_argument("-o", dest="output", type=str, required=True,
+        help=outputHelp)
+    parser_mutate.add_argument("-s", dest="insert", type=int, default=300,
+        help=insertHelp)
+    parser_mutate.add_argument("-v", dest="var", type=int, default=25,
+        help=varHelp)
+    parser_mutate.add_argument("-l", dest="length", type=int, default=50,
+        help=lengthHelp)
+    parser_mutate.add_argument("-n", dest="number", type=int, default=1000000,
+        help=numberHelp)
+    parser_mutate.set_defaults(func=mutate)
+
+    parser_local = subparsers.add_parser("local",
+        description=local.__doc__.split("\n\n")[0])
+    parser_local.add_argument("-r", dest="refFile", required=True,
+        type=argparse.FileType('r'), help="name of a local reference sequence")
+    parser_local.add_argument("-o", dest="output", type=str, required=True,
+        help=outputHelp)
+    parser_local.add_argument("-s", dest="insert", type=int, default=300,
+        help=insertHelp)
+    parser_local.add_argument("-v", dest="var", type=int, default=25,
+        help=varHelp)
+    parser_local.add_argument("-l", dest="length", type=int, default=50,
+        help=lengthHelp)
+    parser_local.add_argument("-n", dest="number", type=int, default=1000000,
+        help=numberHelp)
+    parser_local.set_defaults(func=local)
+
+    arguments = parser.parse_args()
+
+    try:
+        arguments.func(arguments)
+    except ValueError, error:
+        parser.error(error)
 #main
 
-if __name__ == "__main__" :
+if __name__ == "__main__":
     main()
