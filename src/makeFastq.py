@@ -133,21 +133,27 @@ def main():
     """
     Main entry point.
     """
-    outputHelp="prefix of the names of the output files"
-    insertHelp="mean insert size (default=%(default)s)"
-    varHelp="standard deviation of the insert size (default=%(default)s)"
-    lengthHelp="read length (default=%(default)s)"
-    numberHelp="number of reads (default=%(default)s)"
+
+    parent_parser = argparse.ArgumentParser('parent', add_help=False)
+    parent_parser.add_argument("-o", dest="output", type=str, required=True,
+        help="prefix of the names of the output files")
+    parent_parser.add_argument("-s", dest="insert", type=int, default=300,
+        help="mean insert size (default=%(default)s)")
+    parent_parser.add_argument("-v", dest="var", type=int, default=25,
+        help="standard deviation of the insert size (default=%(default)s)")
+    parent_parser.add_argument("-l", dest="length", type=int, default=50,
+        help="read length (default=%(default)s)")
+    parent_parser.add_argument("-n", dest="number", type=int, default=1000000,
+        help="number of reads (default=%(default)s)")
 
     usage = __doc__.split("\n\n\n")
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=usage[0], epilog=usage[1])
-
     subparsers = parser.add_subparsers()
 
     usage = mutate.__doc__.split("\n\n\n")
-    parser_mutate = subparsers.add_parser("mutate",
+    parser_mutate = subparsers.add_parser("mutate", parents=[parent_parser],
         description=usage[0], epilog=usage[1])
     parser_mutate.add_argument("-r", dest="reference", default="NC_000008.10",
         type=str, help="chromosomal accession number (default=%(default)s)")
@@ -161,32 +167,12 @@ def main():
         action="store_const", help="reverse the orientation of the slice")
     parser_mutate.add_argument("-i", dest="input", type=argparse.FileType('r'),
         required=True, help="name of the input file")
-    parser_mutate.add_argument("-o", dest="output", type=str, required=True,
-        help=outputHelp)
-    parser_mutate.add_argument("-s", dest="insert", type=int, default=300,
-        help=insertHelp)
-    parser_mutate.add_argument("-v", dest="var", type=int, default=25,
-        help=varHelp)
-    parser_mutate.add_argument("-l", dest="length", type=int, default=50,
-        help=lengthHelp)
-    parser_mutate.add_argument("-n", dest="number", type=int, default=1000000,
-        help=numberHelp)
     parser_mutate.set_defaults(func=mutate)
 
-    parser_local = subparsers.add_parser("local",
+    parser_local = subparsers.add_parser("local", parents=[parent_parser],
         description=local.__doc__.split("\n\n")[0])
     parser_local.add_argument("-r", dest="refFile", required=True,
         type=argparse.FileType('r'), help="name of a local reference sequence")
-    parser_local.add_argument("-o", dest="output", type=str, required=True,
-        help=outputHelp)
-    parser_local.add_argument("-s", dest="insert", type=int, default=300,
-        help=insertHelp)
-    parser_local.add_argument("-v", dest="var", type=int, default=25,
-        help=varHelp)
-    parser_local.add_argument("-l", dest="length", type=int, default=50,
-        help=lengthHelp)
-    parser_local.add_argument("-n", dest="number", type=int, default=1000000,
-        help=numberHelp)
     parser_local.set_defaults(func=local)
 
     arguments = parser.parse_args()
