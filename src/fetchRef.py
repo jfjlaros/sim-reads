@@ -17,8 +17,8 @@ def fetchRef(accno, output, email):
 
     @arg accno: Accession number of a reference sequence.
     @type accno: str
-    @arg outputName: Open handle to the output file.
-    @type outputName: stream
+    @arg output: Open handle to the output file.
+    @type output: stream
     @arg email: E-mail address used to connect to the NCBI.
     @type email: str
     """
