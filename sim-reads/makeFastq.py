@@ -17,6 +17,7 @@ from Bio import SeqIO
 
 # Location of the Mutalyzer webservice.
 mutalyzerServiceDescription = "https://mutalyzer.nl/services/?wsdl"
+readNumber = 1
 
 def getVariant(handle):
     """
@@ -33,9 +34,8 @@ def writeFastq(results, sequence, numberOfReads, insertSize, variation,
     """
     Make the simulated reads.
     """
-    outputHandle1 = open("%s_1.fq" % results, "w")
-    outputHandle2 = open("%s_2.fq" % results, "w")
-    readNumber = 1
+    global readNumber
+
     for i in range(numberOfReads):
         while True:
             position = random.randint(0, len(sequence) - insertSize)
@@ -44,16 +44,14 @@ def writeFastq(results, sequence, numberOfReads, insertSize, variation,
                 break
         #while
 
-        outputHandle1.write("@%i/1\n%s\n+\n%s\n" % (readNumber, 
+        results[0].write("@%i/1\n%s\n+\n%s\n" % (readNumber, 
             sequence[position:position + readLength], "b" * readLength))
-        outputHandle2.write("@%i/2\n%s\n+\n%s\n" % (
+        results[1].write("@%i/2\n%s\n+\n%s\n" % (
             readNumber, Seq.reverse_complement(
                 sequence[position + myInsertSize - readLength:
                     position + myInsertSize]), "b" * readLength))
         readNumber += 1
     #for
-    outputHandle2.close()
-    outputHandle1.close()
 #writeFastq
 
 def mutate(args):
@@ -113,8 +111,19 @@ def mutate(args):
         resultsHandle.write("%s\n" % i)
     resultsHandle.close()
 
-    writeFastq(args.output, sequence, args.number, args.insert, args.var,
-        args.length)
+    #outputHandle1 = open("%s_1.fq" % results, "w")
+    #outputHandle2 = open("%s_2.fq" % results, "w")
+    results = [open("%s_1.fq" % args.output, "w"),
+        open("%s_2.fq" % args.output, "w")] 
+    if args.heterozygous:
+        writeFastq(results, sequence, args.number / 2, args.insert, args.var,
+            args.length)
+        writeFastq(results, mutalyzerOutput.original, args.number / 2,
+            args.insert, args.var, args.length)
+    #if
+    else:
+        writeFastq(results, sequence, args.number, args.insert, args.var,
+            args.length)
 #mutate
 
 def local(args):
@@ -165,6 +174,8 @@ def main():
          help="accession number of a referencence sequence")
     parser_mutate.add_argument("-t", dest="orientation", default=1, const=2,
         action="store_const", help="reverse the orientation of the slice")
+    parser_mutate.add_argument("-d", dest="heterozygous", default=False,
+        action="store_true", help="make heterozygous variants")
     parser_mutate.add_argument("-i", dest="input", type=argparse.FileType('r'),
         required=True, help="name of the input file")
     parser_mutate.set_defaults(func=mutate)
