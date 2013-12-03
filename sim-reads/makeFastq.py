@@ -133,8 +133,11 @@ def local(args):
     @arg args: Argparse argument list.
     @type args: object
     """
+    results = [open("%s_1.fq" % args.output, "w"),
+        open("%s_2.fq" % args.output, "w")] 
+
     for record in SeqIO.parse(args.refFile, "fasta"):
-        writeFastq(args.output, str(record.seq), args.number, args.insert,
+        writeFastq(results, str(record.seq), args.number, args.insert,
             args.var,args.length)
 #local
 
