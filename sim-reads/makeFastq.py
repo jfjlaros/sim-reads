@@ -136,7 +136,7 @@ def local(args):
     results = [open("%s_1.fq" % args.OUTPUT, "w"),
         open("%s_2.fq" % args.OUTPUT, "w")] 
 
-    for record in SeqIO.parse(args.refFile, "fasta"):
+    for record in SeqIO.parse(args.:EF_FILE, "fasta"):
         write_fastq(results, str(record.seq), args.number, args.insert,
             args.var,args.length)
 #local
@@ -185,8 +185,8 @@ def main():
 
     parser_local = subparsers.add_parser("local", parents=[parent_parser],
         description=local.__doc__.split("\n\n")[0])
-    parser_local.add_argument("-r", dest="refFile", required=True,
-        type=argparse.FileType('r'), help="name of a local reference sequence")
+    parser_local.add_argument("REF_FILE", type=argparse.FileType('r'),
+        help="name of a local reference sequence")
     parser_local.set_defaults(func=local)
 
     arguments = parser.parse_args()
