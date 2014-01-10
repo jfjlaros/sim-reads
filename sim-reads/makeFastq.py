@@ -72,11 +72,11 @@ def mutate(args):
     @type args: object
     """
     # Read the input file.
-    allelic_variant = get_variant(args.input)
-    line = get_variant(args.input)
+    allelic_variant = get_variant(args.INPUT)
+    line = get_variant(args.INPUT)
     while line:
         allelic_variant = "%s;%s" % (allelic_variant, line)
-        line = get_variant(args.input)
+        line = get_variant(args.INPUT)
     #while
     
     # Set up the SOAP interface to Mutalyzer.
@@ -94,7 +94,7 @@ def mutate(args):
     sequence = mutalyzer_output.mutated
 
     # Write the chromosomal description to the results file.
-    results_handle = open("%s.txt" % args.output, "w")
+    results_handle = open("%s.txt" % args.OUTPUT, "w")
     results_handle.write("%s: %s:%i_%i\n\n" % (args.accno, args.reference,
         args.start, args.end))
     
@@ -113,8 +113,8 @@ def mutate(args):
 
     #outputHandle1 = open("%s_1.fq" % results, "w")
     #outputHandle2 = open("%s_2.fq" % results, "w")
-    results = [open("%s_1.fq" % args.output, "w"),
-        open("%s_2.fq" % args.output, "w")] 
+    results = [open("%s_1.fq" % args.OUTPUT, "w"),
+        open("%s_2.fq" % args.OUTPUT, "w")] 
     if args.heterozygous:
         write_fastq(results, sequence, args.number / 2, args.insert, args.var,
             args.length)
@@ -133,8 +133,8 @@ def local(args):
     @arg args: Argparse argument list.
     @type args: object
     """
-    results = [open("%s_1.fq" % args.output, "w"),
-        open("%s_2.fq" % args.output, "w")] 
+    results = [open("%s_1.fq" % args.OUTPUT, "w"),
+        open("%s_2.fq" % args.OUTPUT, "w")] 
 
     for record in SeqIO.parse(args.refFile, "fasta"):
         write_fastq(results, str(record.seq), args.number, args.insert,
@@ -147,7 +147,7 @@ def main():
     """
 
     parent_parser = argparse.ArgumentParser('parent', add_help=False)
-    parent_parser.add_argument("-o", dest="output", type=str, required=True,
+    parent_parser.add_argument("OUTPUT", type=str,
         help="prefix of the names of the output files")
     parent_parser.add_argument("-s", dest="insert", type=int, default=300,
         help="mean insert size (default=%(default)s)")
@@ -167,6 +167,8 @@ def main():
     usage = mutate.__doc__.split("\n\n\n")
     parser_mutate = subparsers.add_parser("mutate", parents=[parent_parser],
         description=usage[0], epilog=usage[1])
+    parser_mutate.add_argument("INPUT", type=argparse.FileType('r'),
+        help="name of the input file")
     parser_mutate.add_argument("-r", dest="reference", default="NC_000008.10",
         type=str, help="chromosomal accession number (default=%(default)s)")
     parser_mutate.add_argument("-b", dest="start", type=int, default=136800000,
@@ -179,8 +181,6 @@ def main():
         action="store_const", help="reverse the orientation of the slice")
     parser_mutate.add_argument("-d", dest="heterozygous", default=False,
         action="store_true", help="make heterozygous variants")
-    parser_mutate.add_argument("-i", dest="input", type=argparse.FileType('r'),
-        required=True, help="name of the input file")
     parser_mutate.set_defaults(func=mutate)
 
     parser_local = subparsers.add_parser("local", parents=[parent_parser],
