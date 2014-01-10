@@ -8,18 +8,17 @@ See the help of the positional arguments for more info.
 """
 # TODO Make the quality score a command line parameter.
 
-import SOAPpy
-import random
 import argparse
+import random
+import SOAPpy
 
-from Bio import Seq
-from Bio import SeqIO
+from Bio import Seq, SeqIO
 
 # Location of the Mutalyzer webservice.
-mutalyzerServiceDescription = "https://mutalyzer.nl/services/?wsdl"
-readNumber = 1
+mutalyzer_service_description = "https://mutalyzer.nl/services/?wsdl"
+read_number = 1
 
-def getVariant(handle):
+def get_variant(handle):
     """
     Read one line from the input file, strip the newline and return it.
 
@@ -27,32 +26,33 @@ def getVariant(handle):
     @type handle: file handle
     """
     return handle.readline().strip("\n")
-#getVariant
+#get_variant
 
-def writeFastq(results, sequence, numberOfReads, insertSize, variation,
-    readLength):
+def write_fastq(results, sequence, number_of_reads, insert_size, variation,
+    read_length):
     """
     Make the simulated reads.
     """
-    global readNumber
+    global read_number
 
-    for i in range(numberOfReads):
+    for i in range(number_of_reads):
         while True:
-            position = random.randint(0, len(sequence) - insertSize)
-            myInsertSize = int(random.normalvariate(insertSize, variation))
-            if position + myInsertSize <= len(sequence):
+            position = random.randint(0, len(sequence) - insert_size)
+            this_insert_size = int(random.normalvariate(insert_size,
+                variation))
+            if position + this_insert_size <= len(sequence):
                 break
         #while
 
-        results[0].write("@%i/1\n%s\n+\n%s\n" % (readNumber, 
-            sequence[position:position + readLength], "b" * readLength))
+        results[0].write("@%i/1\n%s\n+\n%s\n" % (read_number, 
+            sequence[position:position + read_length], "b" * read_length))
         results[1].write("@%i/2\n%s\n+\n%s\n" % (
-            readNumber, Seq.reverse_complement(
-                sequence[position + myInsertSize - readLength:
-                    position + myInsertSize]), "b" * readLength))
-        readNumber += 1
+            read_number, Seq.reverse_complement(
+                sequence[position + this_insert_size - read_length:
+                    position + this_insert_size]), "b" * read_length))
+        read_number += 1
     #for
-#writeFastq
+#write_fastq
 
 def mutate(args):
     """
@@ -72,57 +72,57 @@ def mutate(args):
     @type args: object
     """
     # Read the input file.
-    allelicVariant = getVariant(args.input)
-    line = getVariant(args.input)
+    allelic_variant = get_variant(args.input)
+    line = get_variant(args.input)
     while line:
-        allelicVariant = "%s;%s" % (allelicVariant, line)
-        line = getVariant(args.input)
+        allelic_variant = "%s;%s" % (allelic_variant, line)
+        line = get_variant(args.input)
     #while
     
     # Set up the SOAP interface to Mutalyzer.
-    mutalyzerService = SOAPpy.WSDL.Proxy(mutalyzerServiceDescription)
+    mutalyzer_service = SOAPpy.WSDL.Proxy(mutalyzer_service_description)
 
     # Retrieve the reference sequence.
     if not args.accno:
-        args.accno = mutalyzerService.sliceChromosome(
+        args.accno = mutalyzer_service.sliceChromosome(
             chromAccNo=args.reference, start=args.start, end=args.end,
             orientation=args.orientation)
 
     # Mutate the reference sequence.
-    mutalyzerOutput = mutalyzerService.runMutalyzer(
-        variant = "%s:g.[%s]" % (args.accno, allelicVariant))
-    sequence = mutalyzerOutput.mutated
+    mutalyzer_output = mutalyzer_service.runMutalyzer(
+        variant = "%s:g.[%s]" % (args.accno, allelic_variant))
+    sequence = mutalyzer_output.mutated
 
     # Write the chromosomal description to the results file.
-    resultsHandle = open("%s.txt" % args.output, "w")
-    resultsHandle.write("%s: %s:%i_%i\n\n" % (args.accno, args.reference,
+    results_handle = open("%s.txt" % args.output, "w")
+    results_handle.write("%s: %s:%i_%i\n\n" % (args.accno, args.reference,
         args.start, args.end))
     
-    if int(mutalyzerOutput.errors) > 0:
-        for i in mutalyzerOutput.messages[0]:
+    if int(mutalyzer_output.errors) > 0:
+        for i in mutalyzer_output.messages[0]:
             raise ValueError("(%s): %s" % (i.errorcode, i.message))
     #if
-    if "chromDescription" in mutalyzerOutput:
-        description = mutalyzerOutput.chromDescription
+    if "chromDescription" in mutalyzer_output:
+        description = mutalyzer_output.chromDescription
     else:
-        description = mutalyzerOutput.genomicDescription
+        description = mutalyzer_output.genomicDescription
 
     for i in description.split("[")[1][:-1].split(';'):
-        resultsHandle.write("%s\n" % i)
-    resultsHandle.close()
+        results_handle.write("%s\n" % i)
+    results_handle.close()
 
     #outputHandle1 = open("%s_1.fq" % results, "w")
     #outputHandle2 = open("%s_2.fq" % results, "w")
     results = [open("%s_1.fq" % args.output, "w"),
         open("%s_2.fq" % args.output, "w")] 
     if args.heterozygous:
-        writeFastq(results, sequence, args.number / 2, args.insert, args.var,
+        write_fastq(results, sequence, args.number / 2, args.insert, args.var,
             args.length)
-        writeFastq(results, mutalyzerOutput.original, args.number / 2,
+        write_fastq(results, mutalyzer_output.original, args.number / 2,
             args.insert, args.var, args.length)
     #if
     else:
-        writeFastq(results, sequence, args.number, args.insert, args.var,
+        write_fastq(results, sequence, args.number, args.insert, args.var,
             args.length)
 #mutate
 
@@ -137,7 +137,7 @@ def local(args):
         open("%s_2.fq" % args.output, "w")] 
 
     for record in SeqIO.parse(args.refFile, "fasta"):
-        writeFastq(results, str(record.seq), args.number, args.insert,
+        write_fastq(results, str(record.seq), args.number, args.insert,
             args.var,args.length)
 #local
 
