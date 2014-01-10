@@ -7,11 +7,12 @@ Fetch a reference sequence from the NCBI.
 The e-mail parameter is used to connect to the NCBI.
 """
 
-from Bio import Entrez
 import argparse
 import sys
 
-def fetchRef(accno, output, email):
+from Bio import Entrez
+
+def fetch_ref(accno, output, email):
     """
     Fetch a reference sequence.
 
@@ -29,7 +30,7 @@ def fetchRef(accno, output, email):
 
     output.write(handle.read())
     handle.close()
-#fetchRef
+#fetch_ref
 
 def main():
     """
@@ -50,7 +51,7 @@ def main():
     arguments = parser.parse_args()
 
     try:
-        fetchRef(arguments.input, arguments.output, arguments.email)
+        fetch_ref(arguments.input, arguments.output, arguments.email)
     except ValueError, error:
         parser.error(error)
 #main
