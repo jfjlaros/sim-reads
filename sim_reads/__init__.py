@@ -36,4 +36,4 @@ def docSplit(func):
 
 def version(name):
     return "%s version %s\n\nAuthor   : %s <%s>\nHomepage : %s" % (name,
-        __version__a __author__, __contact__, __homepage__)
+        __version__, __author__, __contact__, __homepage__)

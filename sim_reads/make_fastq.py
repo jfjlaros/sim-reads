@@ -54,7 +54,8 @@ def write_fastq(results, sequence, number_of_reads, insert_size, variation,
     #for
 #write_fastq
 
-def mutate(args):
+def mutate(input_handle, output, insert, var, length, number, reference,
+        start, end, accno, orientation, heterozygous):
     """
     Use a file containing variants to obtain a mutated reference sequence from
     Mutalyzer. Then make paired end reads out of the mutated sequence.
@@ -72,31 +73,29 @@ def mutate(args):
     @type args: object
     """
     # Read the input file.
-    allelic_variant = get_variant(args.INPUT)
-    line = get_variant(args.INPUT)
+    allelic_variant = get_variant(input_handle)
+    line = get_variant(input_handle)
     while line:
         allelic_variant = "%s;%s" % (allelic_variant, line)
-        line = get_variant(args.INPUT)
+        line = get_variant(input_handle)
     #while
     
     # Set up the SOAP interface to Mutalyzer.
     mutalyzer_service = SOAPpy.WSDL.Proxy(mutalyzer_service_description)
 
     # Retrieve the reference sequence.
-    if not args.accno:
-        args.accno = mutalyzer_service.sliceChromosome(
-            chromAccNo=args.reference, start=args.start, end=args.end,
-            orientation=args.orientation)
+    if not accno:
+        accno = mutalyzer_service.sliceChromosome(chromAccNo=reference,
+            start=start, end=end, orientation=orientation)
 
     # Mutate the reference sequence.
     mutalyzer_output = mutalyzer_service.runMutalyzer(
-        variant = "%s:g.[%s]" % (args.accno, allelic_variant))
+        variant = "%s:g.[%s]" % (accno, allelic_variant))
     sequence = mutalyzer_output.mutated
 
     # Write the chromosomal description to the results file.
-    results_handle = open("%s.txt" % args.OUTPUT, "w")
-    results_handle.write("%s: %s:%i_%i\n\n" % (args.accno, args.reference,
-        args.start, args.end))
+    results_handle = open("%s.txt" % output, "w")
+    results_handle.write("%s: %s:%i_%i\n\n" % (accno, reference, start, end))
     
     if int(mutalyzer_output.errors) > 0:
         for i in mutalyzer_output.messages[0]:
@@ -113,41 +112,37 @@ def mutate(args):
 
     #outputHandle1 = open("%s_1.fq" % results, "w")
     #outputHandle2 = open("%s_2.fq" % results, "w")
-    results = [open("%s_1.fq" % args.OUTPUT, "w"),
-        open("%s_2.fq" % args.OUTPUT, "w")] 
-    if args.heterozygous:
-        write_fastq(results, sequence, args.number / 2, args.insert, args.var,
-            args.length)
-        write_fastq(results, mutalyzer_output.original, args.number / 2,
-            args.insert, args.var, args.length)
+    results = [open("%s_1.fq" % output, "w"),
+        open("%s_2.fq" % output, "w")] 
+    if heterozygous:
+        write_fastq(results, sequence, number / 2, insert, var, length)
+        write_fastq(results, mutalyzer_output.original, number / 2, insert,
+            var, length)
     #if
     else:
-        write_fastq(results, sequence, args.number, args.insert, args.var,
-            args.length)
+        write_fastq(results, sequence, number, insert, var, length)
 #mutate
 
-def local(args):
+def local(output, reference_handle, insert, var, length, number):
     """
     Use a local fasta file to make paired end reads.
 
     @arg args: Argparse argument list.
     @type args: object
     """
-    results = [open("%s_1.fq" % args.OUTPUT, "w"),
-        open("%s_2.fq" % args.OUTPUT, "w")] 
+    results = [open("%s_1.fq" % output, "w"),
+        open("%s_2.fq" % output, "w")] 
 
-    for record in SeqIO.parse(args.:EF_FILE, "fasta"):
-        write_fastq(results, str(record.seq), args.number, args.insert,
-            args.var,args.length)
+    for record in SeqIO.parse(reference_handle, "fasta"):
+        write_fastq(results, str(record.seq), number, insert, var, length)
 #local
 
 def main():
     """
     Main entry point.
     """
-
     parent_parser = argparse.ArgumentParser('parent', add_help=False)
-    parent_parser.add_argument("OUTPUT", type=str,
+    parent_parser.add_argument("output", metavar="OUTPUT", type=str,
         help="prefix of the names of the output files")
     parent_parser.add_argument("-s", dest="insert", type=int, default=300,
         help="mean insert size (default=%(default)s)")
@@ -167,8 +162,8 @@ def main():
     usage = mutate.__doc__.split("\n\n\n")
     parser_mutate = subparsers.add_parser("mutate", parents=[parent_parser],
         description=usage[0], epilog=usage[1])
-    parser_mutate.add_argument("INPUT", type=argparse.FileType('r'),
-        help="name of the input file")
+    parser_mutate.add_argument("input_handle", metavar="INPUT",
+        type=argparse.FileType('r'), help="name of the input file")
     parser_mutate.add_argument("-r", dest="reference", default="NC_000008.10",
         type=str, help="chromosomal accession number (default=%(default)s)")
     parser_mutate.add_argument("-b", dest="start", type=int, default=136800000,
@@ -185,8 +180,8 @@ def main():
 
     parser_local = subparsers.add_parser("local", parents=[parent_parser],
         description=local.__doc__.split("\n\n")[0])
-    parser_local.add_argument("REF_FILE", type=argparse.FileType('r'),
-        help="name of a local reference sequence")
+    parser_local.add_argument("reference_handle", metavar="REFERENCE",
+        type=argparse.FileType('r'), help="name of a local reference sequence")
     parser_local.set_defaults(func=local)
 
     arguments = parser.parse_args()
@@ -194,6 +189,12 @@ def main():
     try:
         arguments.func(arguments)
     except ValueError, error:
+        parser.error(error)
+
+    try:
+        arguments.func(**dict((k, v) for k, v in vars(arguments).items()
+            if k not in ('func', 'subcommand')))
+    except ValueError as error:
         parser.error(error)
 #main
 
