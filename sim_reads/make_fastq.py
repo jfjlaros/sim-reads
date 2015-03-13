@@ -16,9 +16,11 @@ from Bio import Seq, SeqIO
 
 from . import doc_split, usage, version
 
+
 # Location of the Mutalyzer webservice.
 mutalyzer_service_description = 'https://mutalyzer.nl/services/?wsdl'
 read_number = 1
+
 
 def get_variant(handle):
     """
