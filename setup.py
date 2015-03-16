@@ -29,8 +29,7 @@ setup(
     install_requires=requires,
     entry_points = {
         'console_scripts': [
-            'make_fastq = sim_reads.make_fastq:main',
-            'fetch_reference = sim_reads.fetch_reference:main'
+            'make_fastq = sim_reads.make_fastq:main'
         ]
     },
     classifiers = [
