@@ -5,7 +5,7 @@ if sys.version_info < (2, 6):
     raise Exception('sim-reads requires Python 2.6 or higher.')
 
 # Todo: How does this play with pip freeze requirement files?
-requires = ['SOAPpy', 'biopython']
+requires = ['suds', 'biopython']
 
 # Python 2.6 does not include the argparse module.
 try:

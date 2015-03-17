@@ -1,16 +1,10 @@
 #!/usr/local/bin/python
 
-"""
-Generate simulated reads.
-
-
-See the help of the positional arguments for more info.
-"""
 # TODO Make the quality score a command line parameter.
 
 import argparse
 import random
-import SOAPpy
+import suds
 
 from Bio import Seq, SeqIO
 
@@ -29,7 +23,7 @@ def get_variant(handle):
     :arg stream handle: Open handle to the input file.
     """
     return handle.readline().strip('\n')
-#get_variant
+
 
 def write_fastq(results, reference, number_of_reads, insert_size, variance,
         read_length):
@@ -55,9 +49,9 @@ def write_fastq(results, reference, number_of_reads, insert_size, variance,
         results[0].write('@%i/1\n%s\n+\n%s\n' % (read_number, 
             reference[position:position + read_length], 'b' * read_length))
         results[1].write('@%i/2\n%s\n+\n%s\n' % (
-            read_number, Seq.reverse_complement(
+            read_number, Seq.reverse_complement(str(
                 reference[position + this_insert_size - read_length:
-                    position + this_insert_size]), 'b' * read_length))
+                    position + this_insert_size])), 'b' * read_length))
         read_number += 1
 
 
@@ -90,7 +84,8 @@ def mutate(input_handle, output, insert_size, variance, read_length,
         line = get_variant(input_handle)
     
     # Set up the SOAP interface to Mutalyzer.
-    mutalyzer_service = SOAPpy.WSDL.Proxy(mutalyzer_service_description)
+    mutalyzer_service = suds.client.Client(
+        mutalyzer_service_description).service
 
     # Retrieve the reference sequence.
     if not accno:
@@ -165,13 +160,12 @@ def main():
     subparsers = parser.add_subparsers()
 
     parser_mutate = subparsers.add_parser('mutate', parents=[parent_parser],
-        description=doc_split(mutate), epilog="""
-        If a chromosomal accession number (option -r) is used, the options -b
-        and -e are used to make a slice of this chromosome. To retrieve the
-        reference sequence of a gene, use the -u option (the options -r, -b and
-        -e are ignored in this case). With the OUTPUT option the prefix for
-        three output files is given: OUTPUT.txt, OUTPUT_1.fq and
-        OUTPUT_2.fq""")
+        description=doc_split(mutate), epilog="""If a chromosomal accession
+        number (option -r) is used, the options -b and -e are used to make a
+        slice of this chromosome. To retrieve the reference sequence of a gene,
+        use the -u option (the options -r, -b and -e are ignored in this case).
+        With the OUTPUT option the prefix for three output files is given:
+        OUTPUT.txt, OUTPUT_1.fq and OUTPUT_2.fq""")
     parser_mutate.add_argument('input_handle', metavar='INPUT',
         type=argparse.FileType('r'), help='name of the input file')
     parser_mutate.add_argument('-r', dest='reference', default='NC_000008.10',
@@ -195,11 +189,6 @@ def main():
     parser_local.set_defaults(func=local)
 
     arguments = parser.parse_args()
-
-    try:
-        arguments.func(arguments)
-    except ValueError, error:
-        parser.error(error)
 
     try:
         arguments.func(**dict((k, v) for k, v in vars(arguments).items()
