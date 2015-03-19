@@ -18,12 +18,13 @@ read_number = 1
 
 def _c2r(reference_length, coverage, read_length):
     """
-    Calculate the number of reads based on the desired coverage.
+    Calculate the number of fragments based on the desired coverage.
 
     :arg int reference_length: Lenght of the reference sequence.
     :arg int coverage: Desired coverage.
+    :arg int read_length: Size of the reads.
 
-    :return int: Number of reads.
+    :return int: Number of fragments.
     """
     return (reference_length * coverage) // (read_length * 2)
 
@@ -37,21 +38,21 @@ def _get_variant(handle):
     return handle.readline().strip('\n')
 
 
-def _write_fastq(results, reference, number_of_reads, insert_size, variance,
-        read_length):
+def _write_fastq(results, reference, number_of_fragments, insert_size,
+        variance, read_length):
     """
     Make simulated reads.
 
     :arg list[stream] results: List of open writable file handles.
     :arg str reference: The reference sequence.
-    :arg int number_of_reads: Number of read pairs to simulate.
+    :arg int number_of_fragments: Number of read pairs to simulate.
     :arg int insert_size: Approximate distance between the reads.
     :arg int variance: Variation of the read length.
     :arg int read_length: Size of the reads.
     """
     global read_number
 
-    for i in range(number_of_reads):
+    for i in range(number_of_fragments):
         while True:
             position = random.randint(0, len(reference) - insert_size)
             this_insert_size = int(random.normalvariate(insert_size, variance))
@@ -68,26 +69,26 @@ def _write_fastq(results, reference, number_of_reads, insert_size, variance,
 
 
 def mutate(input_handle, output, insert_size, variance, read_length,
-        number_of_reads, coverage, reference, start, end, accno, orientation,
-        heterozygous):
+        number_of_fragments, coverage, reference, start, end, accno,
+        orientation, heterozygous):
     """
     Use a file containing variants to obtain a mutated reference sequence from
     Mutalyzer. Then make paired end reads out of the mutated sequence.
 
-    :arg stream input_handle:
-    :arg str output:
+    :arg stream input_handle: Open readable handle to the file containing
+        variant descriptions.
+    :arg str output: Prefix of the names of the output files.
     :arg int insert_size: Approximate distance between the reads.
     :arg int variance: Variation of the read length.
-    :arg length:
     :arg int read_length: Size of the reads.
-    :arg int number_of_reads: Number of read pairs to simulate.
+    :arg int number_of_fragments: Number of read pairs to simulate.
     :arg int coverage: Desired coverage.
-    :arg str reference: The reference sequence.
-    :arg start:
-    :arg end:
-    :arg accno:
-    :arg orientation:
-    :arg heterozygous:
+    :arg str reference: Chromosomal accession number.
+    :arg int start: Begin of the slice of the reference sequence.
+    :arg int end: End of the slice of the reference sequence.
+    :arg str accno: Custom accession number.
+    :arg int orientation: Orientation of the slice (1=forward, 2=reverse).
+    :arg bool heterozygous: Make heterozygous variants.
     """
     # Read the input file.
     allelic_variant = _get_variant(input_handle)
@@ -128,7 +129,7 @@ def mutate(input_handle, output, insert_size, variance, read_length,
 
     results = [open('%s_1.fq' % output, 'w'), open('%s_2.fq' % output, 'w')]
     number_of_pairs = (_c2r(len(sequence), coverage, read_length) or
-        number_of_reads)
+        number_of_fragments)
     if heterozygous:
         _write_fastq(results, sequence, number_of_pairs / 2, insert_size,
             variance, read_length)
@@ -140,16 +141,23 @@ def mutate(input_handle, output, insert_size, variance, read_length,
 
 
 def local(output, reference_handle, insert_size, variance, read_length,
-        number_of_reads, coverage):
+        number_of_fragments, coverage):
     """
     Use a local fasta file to make paired end reads.
 
+    :arg str output: Prefix of the names of the output files.
+    :arg stream reference_handle: Open readable handle to the reference file.
+    :arg int insert_size: Approximate distance between the reads.
+    :arg int variance: Variation of the read length.
+    :arg int read_length: Size of the reads.
+    :arg int number_of_fragments: Number of read pairs to simulate.
+    :arg int coverage: Desired coverage.
     """
     results = [open('%s_1.fq' % output, 'w'), open('%s_2.fq' % output, 'w')]
 
     for record in SeqIO.parse(reference_handle, 'fasta'):
         number_of_pairs = (_c2r(len(record.seq), coverage, read_length) or
-            number_of_reads)
+            number_of_fragments)
         _write_fastq(results, str(record.seq), number_of_pairs, insert_size,
             variance, read_length)
 
@@ -167,8 +175,8 @@ def main():
         help='standard deviation of the insert size (default=%(default)s)')
     parent_parser.add_argument('-l', dest='read_length', type=int, default=50,
         help='read length (default=%(default)s)')
-    parent_parser.add_argument('-n', dest='number_of_reads', type=int,
-        default=1000000, help='number of reads (default=%(default)s)')
+    parent_parser.add_argument('-n', dest='number_of_fragments', type=int,
+        default=1000000, help='number of fragments (default=%(default)s)')
     parent_parser.add_argument('-c', dest='coverage', type=int,
         default=0, help='coverage (default=%(default)s)')
 
