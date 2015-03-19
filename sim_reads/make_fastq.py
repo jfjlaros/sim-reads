@@ -16,7 +16,19 @@ mutalyzer_service_description = 'https://mutalyzer.nl/services/?wsdl'
 read_number = 1
 
 
-def get_variant(handle):
+def _c2r(reference_length, coverage, read_length):
+    """
+    Calculate the number of reads based on the desired coverage.
+
+    :arg int reference_length: Lenght of the reference sequence.
+    :arg int coverage: Desired coverage.
+
+    :return int: Number of reads.
+    """
+    return (reference_length * coverage) // (read_length * 2)
+
+
+def _get_variant(handle):
     """
     Read one line from the input file, strip the newline and return it.
 
@@ -25,7 +37,7 @@ def get_variant(handle):
     return handle.readline().strip('\n')
 
 
-def write_fastq(results, reference, number_of_reads, insert_size, variance,
+def _write_fastq(results, reference, number_of_reads, insert_size, variance,
         read_length):
     """
     Make simulated reads.
@@ -56,7 +68,7 @@ def write_fastq(results, reference, number_of_reads, insert_size, variance,
 
 
 def mutate(input_handle, output, insert_size, variance, read_length,
-        number_of_reads, reference, start, end, accno, orientation,
+        number_of_reads, coverage, reference, start, end, accno, orientation,
         heterozygous):
     """
     Use a file containing variants to obtain a mutated reference sequence from
@@ -69,6 +81,7 @@ def mutate(input_handle, output, insert_size, variance, read_length,
     :arg length:
     :arg int read_length: Size of the reads.
     :arg int number_of_reads: Number of read pairs to simulate.
+    :arg int coverage: Desired coverage.
     :arg str reference: The reference sequence.
     :arg start:
     :arg end:
@@ -77,11 +90,11 @@ def mutate(input_handle, output, insert_size, variance, read_length,
     :arg heterozygous:
     """
     # Read the input file.
-    allelic_variant = get_variant(input_handle)
-    line = get_variant(input_handle)
+    allelic_variant = _get_variant(input_handle)
+    line = _get_variant(input_handle)
     while line:
         allelic_variant = '%s;%s' % (allelic_variant, line)
-        line = get_variant(input_handle)
+        line = _get_variant(input_handle)
     
     # Set up the SOAP interface to Mutalyzer.
     mutalyzer_service = suds.client.Client(
@@ -114,18 +127,20 @@ def mutate(input_handle, output, insert_size, variance, read_length,
     results_handle.close()
 
     results = [open('%s_1.fq' % output, 'w'), open('%s_2.fq' % output, 'w')]
+    number_of_pairs = (_c2r(len(sequence), coverage, read_length) or
+        number_of_reads)
     if heterozygous:
-        write_fastq(results, sequence, number_of_reads / 2, insert_size,
+        _write_fastq(results, sequence, number_of_pairs / 2, insert_size,
             variance, read_length)
-        write_fastq(results, mutalyzer_output.original, number_of_reads / 2,
+        _write_fastq(results, mutalyzer_output.original, number_of_pairs / 2,
             insert_size, variance, read_length)
     else:
-        write_fastq(results, sequence, number_of_reads, insert_size, variance,
+        _write_fastq(results, sequence, number_of_pairs, insert_size, variance,
             read_length)
 
 
 def local(output, reference_handle, insert_size, variance, read_length,
-        number_of_reads):
+        number_of_reads, coverage):
     """
     Use a local fasta file to make paired end reads.
 
@@ -133,7 +148,9 @@ def local(output, reference_handle, insert_size, variance, read_length,
     results = [open('%s_1.fq' % output, 'w'), open('%s_2.fq' % output, 'w')]
 
     for record in SeqIO.parse(reference_handle, 'fasta'):
-        write_fastq(results, str(record.seq), number_of_reads, insert_size,
+        number_of_pairs = (_c2r(len(record.seq), coverage, read_length) or
+            number_of_reads)
+        _write_fastq(results, str(record.seq), number_of_pairs, insert_size,
             variance, read_length)
 
 
@@ -152,6 +169,8 @@ def main():
         help='read length (default=%(default)s)')
     parent_parser.add_argument('-n', dest='number_of_reads', type=int,
         default=1000000, help='number of reads (default=%(default)s)')
+    parent_parser.add_argument('-c', dest='coverage', type=int,
+        default=0, help='coverage (default=%(default)s)')
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
