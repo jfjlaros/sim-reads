@@ -53,11 +53,9 @@ def _write_fastq(results, reference, number_of_fragments, insert_size,
     global read_number
 
     for i in range(number_of_fragments):
-        while True:
-            position = random.randint(0, len(reference) - insert_size)
-            this_insert_size = int(random.normalvariate(insert_size, variance))
-            if position + this_insert_size <= len(reference):
-                break
+        this_insert_size = max(read_length,
+            int(random.normalvariate(insert_size, variance)))
+        position = random.randint(0, len(reference) - this_insert_size)
 
         results[0].write('@%i/1\n%s\n+\n%s\n' % (read_number, 
             reference[position:position + read_length], 'b' * read_length))
@@ -65,6 +63,8 @@ def _write_fastq(results, reference, number_of_fragments, insert_size,
             read_number, Seq.reverse_complement(str(
                 reference[position + this_insert_size - read_length:
                     position + this_insert_size])), 'b' * read_length))
+        if not reference[position + this_insert_size - read_length:
+                position + this_insert_size]:
         read_number += 1
 
 
