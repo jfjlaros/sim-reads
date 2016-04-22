@@ -63,8 +63,6 @@ def _write_fastq(results, reference, number_of_fragments, insert_size,
             read_number, Seq.reverse_complement(str(
                 reference[position + this_insert_size - read_length:
                     position + this_insert_size])), 'b' * read_length))
-        if not reference[position + this_insert_size - read_length:
-                position + this_insert_size]:
         read_number += 1
 
 
